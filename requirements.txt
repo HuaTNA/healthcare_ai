@@ -1,0 +1,6 @@
+pandas
+huggingface_hub
+networkx
+anthropic
+sentence-transformers
+chromadb
