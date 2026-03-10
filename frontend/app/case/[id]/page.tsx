@@ -183,6 +183,7 @@ function saveToLearningProfile(record: {
   difficulty: string;
   score: number | null;
   stages_completed: number;
+  debrief?: any;
 }) {
   if (typeof window === "undefined") return;
   const raw = localStorage.getItem("clinical_tutor_profile");
@@ -229,6 +230,98 @@ export default function CasePage() {
   const [expandedTrend, setExpandedTrend] = useState<string | null>(null);
   const [timelineExpanded, setTimelineExpanded] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const debriefRef = useRef<HTMLDivElement>(null);
+
+  const downloadDebriefPdf = () => {
+    if (!debriefRef.current || !caseData) return;
+    const el = debriefRef.current;
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    // Clone the debrief content and render in a print-friendly page
+    const html = `<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<title>${caseData.case_id} - Case Debrief</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', sans-serif; padding: 40px; color: #1e293b; font-size: 12px; line-height: 1.6; }
+  h1 { font-size: 20px; color: #2c5281; margin-bottom: 4px; }
+  h2 { font-size: 14px; color: #6d28d9; text-transform: uppercase; letter-spacing: 0.05em; margin: 20px 0 8px; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #2c5281; padding-bottom: 12px; margin-bottom: 20px; }
+  .score { font-size: 28px; font-weight: 900; color: #6d28d9; }
+  .score-label { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 12px; display: inline-block; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; background: #f8fafc; }
+  .card-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #6d28d9; margin-bottom: 4px; }
+  .card-value { font-size: 11px; color: #334155; }
+  .flag { background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 8px; margin-bottom: 6px; color: #991b1b; }
+  .action { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 8px; margin-bottom: 6px; color: #92400e; }
+  .takeaway { background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 6px; padding: 8px; margin-bottom: 6px; display: flex; gap: 8px; align-items: flex-start; }
+  .takeaway-num { width: 18px; height: 18px; border-radius: 50%; background: #6d28d9; color: white; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; flex-shrink: 0; }
+  .comp-row { border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 6px; overflow: hidden; }
+  .comp-header { background: #f1f5f9; padding: 6px 10px; display: flex; justify-content: space-between; font-weight: 600; font-size: 11px; }
+  .comp-body { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 8px 10px; }
+  .comp-label { font-size: 9px; font-weight: 700; text-transform: uppercase; color: #94a3b8; margin-bottom: 2px; }
+  .meta { font-size: 10px; color: #94a3b8; }
+  .timing { padding: 8px; border-radius: 6px; margin-bottom: 16px; }
+  .timing-ok { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; }
+  .timing-delayed { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+  @media print { body { padding: 20px; } }
+</style>
+</head><body>
+<div class="header">
+  <div>
+    <h1>${caseData.case_id}: ${caseData.admission_diagnosis}</h1>
+    <div class="meta">${caseData.age}y / ${caseData.gender} &bull; ${caseData.educational_framing?.specialty || ""} &bull; ${caseData.educational_framing?.difficulty || ""} &bull; ${new Date().toLocaleDateString()}</div>
+  </div>
+  <div style="text-align:right">
+    <div class="score">${debriefData?.overall_score ?? ""}/10</div>
+    <span class="score-label" style="background:${
+      debriefData?.score_label === "Expert" || debriefData?.score_label === "Proficient" ? "#d1fae5;color:#065f46"
+      : debriefData?.score_label === "Competent" ? "#dbeafe;color:#1e40af"
+      : "#fef3c7;color:#92400e"
+    }">${debriefData?.score_label || ""}</span>
+  </div>
+</div>
+${debriefData?.expert_path ? `
+<h2>Expert Reasoning Path</h2>
+<div class="grid">
+  ${["presentation_focus", "key_pivot", "optimal_workup", "optimal_management"]
+    .filter(k => debriefData.expert_path[k])
+    .map(k => `<div class="card"><div class="card-label">${k.replace(/_/g, " ")}</div><div class="card-value">${debriefData.expert_path[k]}</div></div>`)
+    .join("")}
+</div>` : ""}
+${debriefData?.student_vs_expert?.length ? `
+<h2>Your Path vs Expert Path</h2>
+${debriefData.student_vs_expert.map((c: any) => `
+<div class="comp-row">
+  <div class="comp-header"><span>${c.stage}</span><span>${c.alignment}</span></div>
+  <div class="comp-body">
+    <div><div class="comp-label">You said</div><div>${c.student_did}</div></div>
+    <div><div class="comp-label">Expert would</div><div>${c.expert_would}</div></div>
+  </div>
+  <div style="padding:4px 10px 8px;font-style:italic;color:#64748b;font-size:11px">${c.comment}</div>
+</div>`).join("")}` : ""}
+${debriefData?.missed_red_flags?.length ? `
+<h2>Missed Red Flags</h2>
+${debriefData.missed_red_flags.map((f: string) => `<div class="flag">${f}</div>`).join("")}` : ""}
+${debriefData?.unnecessary_actions?.length ? `
+<h2>Unnecessary Actions</h2>
+${debriefData.unnecessary_actions.map((a: string) => `<div class="action">${a}</div>`).join("")}` : ""}
+${debriefData?.management_timing ? `
+<h2>Management Timing</h2>
+<div class="timing ${debriefData.management_timing.delayed ? "timing-delayed" : "timing-ok"}">${debriefData.management_timing.details}</div>` : ""}
+${debriefData?.takeaways?.length ? `
+<h2>Key Takeaways</h2>
+${debriefData.takeaways.map((t: string, i: number) => `<div class="takeaway"><div class="takeaway-num">${i + 1}</div><div>${t}</div></div>`).join("")}` : ""}
+</body></html>`;
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.onload = () => {
+      printWindow.print();
+    };
+  };
 
   useEffect(() => {
     fetch(`${API}/api/case/${caseId}`)
@@ -1143,10 +1236,7 @@ export default function CasePage() {
                       </div>
                     </div>
                   )}
-                  <div ref={chatEndRef} />
-                </div>
-
-                {/* Case Review + Debrief Buttons (after Stage 4) */}
+                  {/* Case Review + Debrief Buttons (after Stage 4) */}
                 {stage >= 4 && (!reviewData || !debriefData) && (
                   <div className="pb-3 flex justify-center gap-3">
                     {!reviewData && (
@@ -1202,6 +1292,7 @@ export default function CasePage() {
                               difficulty: caseData.educational_framing?.difficulty || "Intern",
                               score: data.debrief.overall_score ?? null,
                               stages_completed: stage,
+                              debrief: data.debrief,
                             });
                           }
                           setDebriefLoading(false);
@@ -1226,9 +1317,9 @@ export default function CasePage() {
 
                 {/* Structured Debrief Panel */}
                 {debriefData && !debriefData.error && (
-                  <div className="mb-4 bg-gradient-to-br from-violet-50 to-indigo-50 border border-violet-200 rounded-2xl overflow-hidden">
+                  <div ref={debriefRef} className="mb-4 bg-gradient-to-br from-violet-50 to-indigo-50 border border-violet-200 rounded-2xl">
                     {/* Debrief Header with Score */}
-                    <div className="p-5 border-b border-violet-200 flex items-center justify-between">
+                    <div className="p-5 border-b border-violet-200 flex items-center justify-between rounded-t-2xl">
                       <div className="flex items-center gap-3">
                         <div className="size-12 rounded-full bg-violet-600 flex items-center justify-center">
                           <span className="material-symbols-outlined text-white text-2xl">analytics</span>
@@ -1238,15 +1329,25 @@ export default function CasePage() {
                           <p className="text-xs text-slate-500">Your performance analysis</p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-3xl font-black text-violet-700">{debriefData.overall_score}/10</div>
-                        <div className={`text-xs font-bold px-2 py-0.5 rounded-full inline-block ${
-                          debriefData.score_label === "Expert" || debriefData.score_label === "Proficient"
-                            ? "bg-emerald-100 text-emerald-800"
-                            : debriefData.score_label === "Competent"
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-amber-100 text-amber-800"
-                        }`}>{debriefData.score_label}</div>
+                      <div className="flex items-center gap-4">
+                        <button
+                          onClick={downloadDebriefPdf}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-violet-700 bg-white border border-violet-200 rounded-lg hover:bg-violet-100 transition-colors"
+                          title="Download as PDF"
+                        >
+                          <span className="material-symbols-outlined text-sm">download</span>
+                          PDF
+                        </button>
+                        <div className="text-right">
+                          <div className="text-3xl font-black text-violet-700">{debriefData.overall_score}/10</div>
+                          <div className={`text-xs font-bold px-2 py-0.5 rounded-full inline-block ${
+                            debriefData.score_label === "Expert" || debriefData.score_label === "Proficient"
+                              ? "bg-emerald-100 text-emerald-800"
+                              : debriefData.score_label === "Competent"
+                              ? "bg-blue-100 text-blue-800"
+                              : "bg-amber-100 text-amber-800"
+                          }`}>{debriefData.score_label}</div>
+                        </div>
                       </div>
                     </div>
 
@@ -1257,19 +1358,19 @@ export default function CasePage() {
                           <span className="material-symbols-outlined text-sm">route</span>
                           Expert Reasoning Path
                         </h4>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {[
                             { label: "Presentation Focus", value: debriefData.expert_path.presentation_focus, icon: "visibility" },
                             { label: "Key Pivot Point", value: debriefData.expert_path.key_pivot, icon: "turn_right" },
                             { label: "Optimal Workup", value: debriefData.expert_path.optimal_workup, icon: "biotech" },
                             { label: "Optimal Management", value: debriefData.expert_path.optimal_management, icon: "medication" },
-                          ].map((item) => (
-                            <div key={item.label} className="bg-white/70 rounded-lg p-3 border border-violet-100">
-                              <div className="flex items-center gap-1.5 mb-1">
-                                <span className="material-symbols-outlined text-violet-500 text-sm">{item.icon}</span>
+                          ].filter((item) => item.value).map((item) => (
+                            <div key={item.label} className="bg-white/70 rounded-xl p-4 border border-violet-100">
+                              <div className="flex items-center gap-1.5 mb-2">
+                                <span className="material-symbols-outlined text-violet-500 text-base">{item.icon}</span>
                                 <span className="text-[10px] font-bold text-violet-600 uppercase tracking-wider">{item.label}</span>
                               </div>
-                              <p className="text-xs text-slate-700 leading-relaxed">{item.value}</p>
+                              <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">{item.value}</p>
                             </div>
                           ))}
                         </div>
@@ -1285,7 +1386,7 @@ export default function CasePage() {
                         </h4>
                         <div className="space-y-3">
                           {debriefData.student_vs_expert.map((comp: any, i: number) => (
-                            <div key={i} className="bg-white/70 rounded-lg border border-violet-100 overflow-hidden">
+                            <div key={i} className="bg-white/70 rounded-lg border border-violet-100">
                               <div className="flex items-center justify-between px-3 py-2 bg-violet-100/50">
                                 <span className="text-xs font-bold text-slate-700">{comp.stage}</span>
                                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
@@ -1405,6 +1506,9 @@ export default function CasePage() {
                     )}
                   </div>
                 )}
+
+                  <div ref={chatEndRef} />
+                </div>
 
                 {/* Collapsible Evidence Panel */}
                 {showEvidence && caseData && (
