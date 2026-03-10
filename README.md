@@ -4,6 +4,27 @@ AI-Powered Clinical Teaching Assistant built for the 2026 Healthcare AI Hackatho
 
 Uses real de-identified ICU patient data (MIMIC-III) to create interactive clinical reasoning exercises. A Claude-powered AI tutor guides students through progressive case disclosure, Socratic questioning, and evidence-based feedback.
 
+## Disclaimer
+
+> This repository is for educational and research purposes only. It is not a medical device and must not be used for clinical diagnosis, treatment, or real-world patient care decisions.
+
+### Medical Use Notice
+
+- The content and outputs of this project are not medical advice.
+- Clinical decisions must be made by licensed healthcare professionals.
+- This tool is intended for learning clinical reasoning, not replacing clinician judgment.
+
+### Data, Privacy, and Compliance
+
+- The project uses de-identified data derived from public datasets (including MIMIC-III and related processed subsets).
+- Do not upload, store, or process identifiable patient information (PHI/PII) with this project.
+- Users are responsible for complying with all applicable laws, institutional policies, and dataset license terms.
+
+### Limitation of Liability
+
+- This software is provided "as is" without warranties of any kind.
+- The authors and contributors are not liable for any direct or indirect damages resulting from use of this project.
+
 ## Architecture
 
 ```
@@ -150,3 +171,9 @@ All dates are shifted for de-identification. Hosted on HuggingFace (`bavehackath
 - **Frontend**: Next.js 16, React, TypeScript, Tailwind CSS
 - **AI**: Claude (Haiku 4.5 for dev, Sonnet for demo)
 - **Data**: HuggingFace Datasets, MIMIC-III subset
+
+## License
+
+This source code is licensed under the MIT License. See [LICENSE](./LICENSE).
+
+Note: Dataset licenses and third-party model/API terms apply separately and must also be followed.
