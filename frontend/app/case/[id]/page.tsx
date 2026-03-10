@@ -64,6 +64,14 @@ interface CaseData {
   }[];
   quality_findings: { type: string; severity: string; message: string }[];
   kg_stats: { total_nodes: number; total_edges: number };
+  background?: {
+    chief_complaint?: string;
+    hpi?: string;
+    past_medical_history?: string;
+    allergies?: string;
+    social_history?: string;
+    family_history?: string;
+  };
   educational_framing: EducationalFraming;
   provenance?: {
     source: string;
@@ -463,6 +471,54 @@ export default function CasePage() {
             </div>
           </div>
         </section>
+
+        {/* Patient Background */}
+        {caseData.background && Object.keys(caseData.background).length > 0 && (
+          <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
+            <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+              <span className="material-symbols-outlined text-[#2c5281] text-lg">person</span>
+              Patient Background
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {caseData.background.chief_complaint && (
+                <div className="md:col-span-2 bg-blue-50 border border-blue-100 rounded-xl p-4">
+                  <p className="text-xs font-bold text-blue-700 uppercase tracking-wider mb-1">Chief Complaint</p>
+                  <p className="text-sm text-slate-700 leading-relaxed">{caseData.background.chief_complaint}</p>
+                </div>
+              )}
+              {caseData.background.hpi && (
+                <div className="md:col-span-2 bg-slate-50 border border-slate-100 rounded-xl p-4">
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">History of Present Illness</p>
+                  <p className="text-sm text-slate-700 leading-relaxed">{caseData.background.hpi}</p>
+                </div>
+              )}
+              {caseData.background.past_medical_history && (
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Past Medical History</p>
+                  <p className="text-sm text-slate-700 leading-relaxed">{caseData.background.past_medical_history}</p>
+                </div>
+              )}
+              {caseData.background.allergies && (
+                <div className="bg-red-50 border border-red-100 rounded-xl p-4">
+                  <p className="text-xs font-bold text-red-600 uppercase tracking-wider mb-1">Allergies</p>
+                  <p className="text-sm text-slate-700 leading-relaxed">{caseData.background.allergies}</p>
+                </div>
+              )}
+              {caseData.background.social_history && (
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Social History</p>
+                  <p className="text-sm text-slate-700 leading-relaxed">{caseData.background.social_history}</p>
+                </div>
+              )}
+              {caseData.background.family_history && (
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Family History</p>
+                  <p className="text-sm text-slate-700 leading-relaxed">{caseData.background.family_history}</p>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
 
         {/* Educational Framing Panel */}
         {caseData.educational_framing && (

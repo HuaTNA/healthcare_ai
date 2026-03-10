@@ -453,6 +453,7 @@ def get_case(case_id: str):
             "total_nodes": kg.graph.number_of_nodes(),
             "total_edges": kg.graph.number_of_edges(),
         },
+        "background": _get_detailed_background(patient),
     }
 
 
@@ -651,25 +652,39 @@ def _get_specialty(patient) -> str:
     return "General"
 
 
+def _extract_summary_sections(text: str) -> dict[str, str]:
+    """Extract key sections from a MIMIC discharge summary."""
+    import re
+    sections: dict[str, str] = {}
+    # Section header patterns in MIMIC discharge summaries
+    section_patterns = [
+        ("chief_complaint", r"(?i)(?:chief complaint|reason for admission)[:\s]*\n?"),
+        ("hpi", r"(?i)(?:history of present illness|hpi)[:\s]*\n?"),
+        ("past_medical_history", r"(?i)(?:past medical history|pmh|pmhx)[:\s]*\n?"),
+        ("allergies", r"(?i)(?:allergies|allergy)[:\s]*\n?"),
+        ("social_history", r"(?i)(?:social history)[:\s]*\n?"),
+        ("family_history", r"(?i)(?:family history)[:\s]*\n?"),
+    ]
+    for key, pat in section_patterns:
+        m = re.search(pat + r"(.*?)(?:\n\s*\n|\n[A-Z][A-Za-z ]+:|\Z)", text, re.DOTALL)
+        if m:
+            content = " ".join(m.group(1).split()).strip()
+            if len(content) > 10:
+                sections[key] = content
+    return sections
+
+
 def _get_brief_background(patient) -> str:
     """Extract a brief background snippet (≤150 chars) from the discharge summary."""
     text = (patient.discharge_summary or "").strip()
     if not text:
         return ""
-    # Try to find HPI / chief complaint / history of present illness section
-    import re
-    # Common MIMIC section headers
-    for pattern in [
-        r"(?i)history of present illness[:\s]*\n?(.*?)(?:\n\s*\n|\n[A-Z])",
-        r"(?i)chief complaint[:\s]*\n?(.*?)(?:\n\s*\n|\n[A-Z])",
-        r"(?i)hpi[:\s]*\n?(.*?)(?:\n\s*\n|\n[A-Z])",
-        r"(?i)reason for.*?admission[:\s]*\n?(.*?)(?:\n\s*\n|\n[A-Z])",
-    ]:
-        m = re.search(pattern, text, re.DOTALL)
-        if m:
-            snippet = " ".join(m.group(1).split())  # collapse whitespace
-            if len(snippet) > 20:
-                return (snippet[:147] + "...") if len(snippet) > 150 else snippet
+    sections = _extract_summary_sections(text)
+    # Prefer HPI, then chief complaint
+    for key in ("hpi", "chief_complaint"):
+        if key in sections:
+            snippet = sections[key]
+            return (snippet[:147] + "...") if len(snippet) > 150 else snippet
     # Fallback: first meaningful sentence from summary
     lines = [l.strip() for l in text.split("\n") if len(l.strip()) > 30]
     if lines:
@@ -678,11 +693,112 @@ def _get_brief_background(patient) -> str:
     return ""
 
 
+def _get_detailed_background(patient) -> dict:
+    """Extract detailed background sections for case detail page."""
+    text = (patient.discharge_summary or "").strip()
+    if not text:
+        return {}
+    sections = _extract_summary_sections(text)
+    result = {}
+    # Truncate each section to a reasonable length for display
+    limits = {
+        "chief_complaint": 300,
+        "hpi": 800,
+        "past_medical_history": 500,
+        "allergies": 200,
+        "social_history": 300,
+        "family_history": 300,
+    }
+    for key, content in sections.items():
+        limit = limits.get(key, 300)
+        result[key] = (content[:limit - 3] + "...") if len(content) > limit else content
+    return result
+
+
 def _get_complexity(patient) -> str:
-    """Simple/Moderate/Complex based on diagnosis+drug count."""
+    """Clinical complexity score considering multiple dimensions.
+
+    Dimensions:
+    - Multi-organ involvement: number of distinct ICD-9 chapter categories
+    - Polypharmacy burden: unique drug count
+    - Diagnostic uncertainty: number of diagnoses (more = harder to prioritize)
+    - Lab monitoring intensity: unique lab types ordered
+    - Critical lab values: labs outside reference ranges
+    """
+    import math
+
     n_dx = len(patient.diagnoses)
     n_drugs = len(set(rx["drug"] for rx in patient.prescriptions if rx.get("drug")))
-    score = n_dx + n_drugs
+    n_unique_labs = len(set(l.get("lab_name") for l in patient.labs if l.get("lab_name")))
+
+    # Multi-organ involvement: count distinct ICD-9 chapters (first 3 digits)
+    icd9_chapters = set()
+    for d in patient.diagnoses:
+        code = d.get("icd9_code", "")
+        try:
+            num = float(code.replace("V", "800").replace("E", "900")[:3])
+            if num < 140:
+                icd9_chapters.add("infectious")
+            elif num < 240:
+                icd9_chapters.add("neoplasm")
+            elif num < 280:
+                icd9_chapters.add("endocrine")
+            elif num < 290:
+                icd9_chapters.add("blood")
+            elif num < 320:
+                icd9_chapters.add("mental")
+            elif num < 390:
+                icd9_chapters.add("nervous")
+            elif num < 460:
+                icd9_chapters.add("circulatory")
+            elif num < 520:
+                icd9_chapters.add("respiratory")
+            elif num < 580:
+                icd9_chapters.add("digestive")
+            elif num < 630:
+                icd9_chapters.add("genitourinary")
+            elif num < 680:
+                icd9_chapters.add("pregnancy")
+            elif num < 710:
+                icd9_chapters.add("skin")
+            elif num < 740:
+                icd9_chapters.add("musculoskeletal")
+            else:
+                icd9_chapters.add("other")
+        except (ValueError, TypeError):
+            pass
+    n_organ_systems = len(icd9_chapters)
+
+    # Critical lab values (approximate check using known ranges)
+    critical_ranges = {
+        "Potassium": (3.5, 5.0), "Sodium": (136, 145), "Glucose": (70, 400),
+        "Creatinine": (0.6, 1.2), "Lactate": (0.5, 2.0), "pH": (7.35, 7.45),
+        "Hemoglobin": (7.0, 17.5), "Platelet Count": (150, 400),
+        "INR(PT)": (0.8, 1.1), "Troponin T": (0, 0.04),
+    }
+    n_critical = 0
+    seen_critical = set()
+    for lab in patient.labs:
+        name = lab.get("lab_name", "")
+        if name in critical_ranges and name not in seen_critical:
+            try:
+                val = float(lab.get("value", ""))
+                lo, hi = critical_ranges[name]
+                if val < lo * 0.8 or val > hi * 1.5:  # significantly abnormal
+                    n_critical += 1
+                    seen_critical.add(name)
+            except (ValueError, TypeError):
+                pass
+
+    # Weighted complexity score
+    score = (
+        n_organ_systems * 3        # multi-organ = major complexity driver
+        + n_dx * 0.5               # more diagnoses = harder to manage
+        + min(n_drugs, 30) * 0.3   # polypharmacy (capped)
+        + min(n_unique_labs, 20) * 0.2  # monitoring intensity (capped)
+        + n_critical * 4           # critical values = high acuity
+    )
+
     if score <= 10:
         return "Simple"
     elif score <= 25:
