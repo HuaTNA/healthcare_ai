@@ -831,11 +831,11 @@ ${debriefData.takeaways.map((t: string, i: number) => `<div class="takeaway"><di
                 <div className="space-y-4">
                   {LAB_GROUP_ORDER.filter((g) => labs[g] && labs[g].length > 0).map((groupName) => (
                     <div key={groupName} className="bg-white rounded-xl border border-[#2c5281]/10 overflow-hidden">
-                      <div className="bg-[#2c5281]/5 px-4 py-2 flex items-center gap-2 border-b border-[#2c5281]/10">
-                        <span className="material-symbols-outlined text-[#2c5281] text-lg">
+                      <div className="bg-[#2c5281]/5 px-3 py-2 flex items-center gap-2 border-b border-[#2c5281]/10">
+                        <span className="material-symbols-outlined text-[#2c5281] text-base">
                           {LAB_GROUP_ICONS[groupName] || "biotech"}
                         </span>
-                        <span className="text-sm font-bold text-[#2c5281]">{groupName}</span>
+                        <span className="text-xs font-bold text-[#2c5281]">{groupName}</span>
                         <span className="text-xs text-slate-400 ml-auto">
                           {labs[groupName].filter((l) => l.lab.status !== "normal").length > 0 && (
                             <span className="text-amber-600 font-semibold">
@@ -844,71 +844,50 @@ ${debriefData.takeaways.map((t: string, i: number) => `<div class="takeaway"><di
                           )}
                         </span>
                       </div>
-                      <table className="w-full text-left text-sm">
-                        <thead className="text-slate-500 text-xs uppercase tracking-wider">
-                          <tr>
-                            <th className="px-4 py-2">Test</th>
-                            <th className="px-4 py-2">Value</th>
-                            <th className="px-4 py-2">Unit</th>
-                            <th className="px-4 py-2">Status</th>
-                            <th className="px-4 py-2">Trend</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#2c5281]/5">
-                          {labs[groupName].map(({ name, lab }) => {
-                            const trend = caseData.lab_trends?.[name];
-                            return (
-                              <tr
-                                key={name}
-                                className={`transition-colors cursor-pointer ${
-                                  lab.status === "high"
-                                    ? "bg-red-50 hover:bg-red-100"
-                                    : lab.status === "low"
-                                    ? "bg-blue-50 hover:bg-blue-100"
-                                    : "hover:bg-[#2c5281]/5"
-                                }`}
-                                onClick={() => trend && setExpandedTrend(expandedTrend === name ? null : name)}
-                              >
-                                <td className="px-4 py-2 font-medium">{name}</td>
-                                <td className={`px-4 py-2 font-mono font-semibold ${
-                                  lab.status === "high"
-                                    ? "text-red-700"
-                                    : lab.status === "low"
-                                    ? "text-blue-700"
-                                    : ""
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-px bg-slate-100 p-px">
+                        {labs[groupName].map(({ name, lab }) => {
+                          const trend = caseData.lab_trends?.[name];
+                          const isAbnormal = lab.status === "high" || lab.status === "low";
+                          const isExpanded = expandedTrend === name;
+                          return (
+                            <div
+                              key={name}
+                              onClick={() => trend && setExpandedTrend(isExpanded ? null : name)}
+                              className={`p-2.5 cursor-pointer transition-colors ${
+                                isExpanded
+                                  ? "bg-[#2c5281]/5 ring-1 ring-[#2c5281]/30"
+                                  : lab.status === "high"
+                                  ? "bg-red-50 hover:bg-red-100"
+                                  : lab.status === "low"
+                                  ? "bg-blue-50 hover:bg-blue-100"
+                                  : "bg-white hover:bg-slate-50"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between mb-0.5">
+                                <span className="text-[10px] font-semibold text-slate-500 truncate">{name}</span>
+                                {isAbnormal && (
+                                  <span className={`material-symbols-outlined text-xs ${lab.status === "high" ? "text-red-500" : "text-blue-500"}`}>
+                                    {lab.status === "high" ? "arrow_upward" : "arrow_downward"}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-baseline gap-1">
+                                <span className={`text-sm font-bold font-mono ${
+                                  lab.status === "high" ? "text-red-700" : lab.status === "low" ? "text-blue-700" : "text-slate-900"
                                 }`}>
                                   {lab.value}
-                                </td>
-                                <td className="px-4 py-2 text-slate-500">{lab.unit}</td>
-                                <td className="px-4 py-2">
-                                  {lab.status === "high" && (
-                                    <span className="inline-flex items-center gap-1 text-xs font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded">
-                                      <span className="material-symbols-outlined text-xs">arrow_upward</span>
-                                      HIGH
-                                    </span>
-                                  )}
-                                  {lab.status === "low" && (
-                                    <span className="inline-flex items-center gap-1 text-xs font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded">
-                                      <span className="material-symbols-outlined text-xs">arrow_downward</span>
-                                      LOW
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="px-4 py-2">
-                                  {trend && (
-                                    <Sparkline
-                                      points={trend.points}
-                                      refLow={trend.ref_low}
-                                      refHigh={trend.ref_high}
-                                    />
-                                  )}
-                                  {trend && <span className="text-[10px] text-slate-400 ml-1">{trend.points.length}pts</span>}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                                </span>
+                                <span className="text-[9px] text-slate-400">{lab.unit}</span>
+                              </div>
+                              {trend && (
+                                <div className="mt-1">
+                                  <Sparkline points={trend.points} refLow={trend.ref_low} refHigh={trend.ref_high} />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                       {/* Expanded trend detail */}
                       {labs[groupName].some(({ name }) => expandedTrend === name) && (() => {
                         const trend = caseData.lab_trends?.[expandedTrend!];
